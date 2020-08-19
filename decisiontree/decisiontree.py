@@ -491,7 +491,7 @@ dt.add_rule('worktime', "<1", outcome=5)
 dt.add_rule('worktime', ">=1<10", next_step='criminal')
 dt.add_rule('worktime', ">=10", next_step='member')
 
-dt.add_rule('criminal', "", outcome=5)
+dt.add_rule('criminal', outcome=5)
 dt.add_fail('criminal', next_step='member')
 
 dt.add_rule('member', '<5', outcome=5)
@@ -503,5 +503,3 @@ dt.build_tree()
 
 pred = dt.predict(want=True, worktime=10, criminal=False, member=9)
 print(f"Predicted: {pred}")
-
-r1 = RuleClass()
