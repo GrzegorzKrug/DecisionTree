@@ -10,7 +10,9 @@ class RuleBase:
     def __init__(self):
         self.outcome = None
         self.next_step = None
-        self.type = None
+
+        self.desc = ""
+        self.short_desc = ""
 
         self.eq = None
         self.sm = None
@@ -87,8 +89,9 @@ class RuleClass(RuleBase):
 
     def setup_conditions(self, bl=None, eq=None, diff=None, sm=None, sme=None, big=None, bige=None):
         if bl:
+            self.desc = "Boolean Check"
+            self.short_desc = "True"
             conds = [self.check_boolean]
-            self.type = "Boolean Check"
 
         elif sm and sme or big and bige or eq and diff:
             raise ValueError("Can not interpret conditions. Some types are not allowed simultaneously")
@@ -99,8 +102,8 @@ class RuleClass(RuleBase):
             if sm:
                 sm = int(sm)
                 self.sm = sm
-                conds.append(self.check_smaller)
                 types.append(f"<{sm}")
+                conds.append(self.check_smaller)
 
             elif sme:
                 sme = int(sme)
@@ -131,17 +134,20 @@ class RuleClass(RuleBase):
             if max_val and min_val and min_val > max_val:
                 raise ValueError(f"Conditions are impossible: {min_val} < {max_val}")
 
-            self.type = "Comparison check: " + ", ".join(types)
+            self.short_desc = " & ".join(types)
+            self.desc = "Comparison check: " + self.short_desc
 
         elif eq:
             eq = int(eq)
             self.eq = eq
-            self.type = f"Equal == {eq}"
+            self.desc = f"Equal == {eq}"
+            self.short_desc = f"=={eq}"
             conds = [self.check_equal]
 
         else:
-            self.type = "Boolean Check"
             warnings.warn(f"No condition. Using boolean checking")
+            self.desc = "Boolean Check"
+            self.short_desc = "True"
             conds = [self.check_boolean]
 
         self.conds = conds
@@ -154,7 +160,7 @@ class RuleClass(RuleBase):
         return True
 
     def __str__(self):
-        return str(self.type)
+        return str(self.desc)
 
 
 class DecisionTree:
@@ -350,7 +356,7 @@ class DecisionTree:
 
         for key, rul_list in self.tree.items():
             if key not in fkeys:
-                warnings.warn(f"{key} has not fail outcome. use 'dt.add_fail()'")
+                warnings.warn(f"{key} has no fail outcome. use 'dt.add_fail()'")
             for rulob in rul_list:
                 nx = rulob.next_step
                 if nx and nx not in tree_keys:
@@ -456,12 +462,101 @@ class DecisionTree:
             not_vis = [node for node in nodes if node not in visited]
             return False, f"Some nodes was not visited {not_vis}", (None, None)
 
-    def draw_graph(self):
+    def _get_network_nodes(self, pos, graph):
+        node_x = []
+        node_y = []
+        for node in graph.nodes():
+            x, y = pos[node]
+            node_x.append(x)
+            node_y.append(y)
+
+        edge_x = []
+        edge_y = []
+
+        for p0, p1 in graph.edges():
+            x0, y0 = pos[p0]
+            x1, y1 = pos[p1]
+            edge_x.append(x0)
+            edge_x.append(x1)
+            edge_x.append(None)
+
+            edge_y.append(y0)
+            edge_y.append(y1)
+            edge_y.append(None)
+
+        return node_x, node_y, edge_x, edge_y
+
+    def draw_graph_plotly(self):
+        """
+
+        Returns:
+
+        """
         G = nx.Graph()
-        # roots, nodes = self._get_roots_with_nodes()
-        plt.figure(figsize=(16, 9))
-        nx.draw(G)
-        plt.show()
+        next_list = [self.root]
+        while next_list:
+            tmp_list = next_list
+            next_list = []
+            for cur_name in tmp_list:
+                that_node = self.nodes[cur_name]
+                for chc in that_node['childs']:
+                    G.add_node(chc)
+                    G.add_edge(cur_name, chc)
+                    next_list.append(chc)
+                if cur_name in self.fail:
+                    if self.fail[cur_name]['outcome'] is not None:
+                        G.add_edge(cur_name, f"{cur_name}_else")
+                    else:
+                        G.add_edge(cur_name, self.fail[cur_name]['next'])
+
+        pos = nx.spring_layout(G)
+
+        # plt.figure()
+        # nx.draw(G)
+        # plt.show()
+        node_x, node_y, edge_x, edge_y = self._get_network_nodes(pos, G)
+
+        node_trace = go.Scatter(
+                x=node_x, y=node_y,
+                mode='markers',
+                hoverinfo='text',
+                marker=dict(
+                        showscale=True,
+                        # colorscale options
+                        # 'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
+                        # 'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
+                        # 'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
+                        colorscale='YlGnBu',
+                        reversescale=True,
+                        color=[],
+                        size=10,
+                        colorbar=dict(
+                                thickness=15,
+                                title='Node Connections',
+                                xanchor='left',
+                                titleside='right'
+                        ),
+                        line_width=2))
+
+        edge_trace = go.Scatter(x=edge_x, y=edge_y)
+
+        layout = go.Layout(
+                title='<br>Network graph made with Python',
+                titlefont_size=16,
+                showlegend=False,
+                hovermode='closest',
+                margin=dict(b=20, l=5, r=5, t=40),
+                annotations=[dict(
+                        text="Python code: <a href='https://plotly.com/ipython-notebooks/network-graphs/'> https://plotly.com/ipython-notebooks/network-graphs/</a>",
+                        showarrow=False,
+                        xref="paper", yref="paper",
+                        x=0.005, y=-0.002)],
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
+
+        fig = go.Figure(data=[node_trace, edge_trace], layout=layout)
+        fig.write_image("tree.jpg", width=1600, height=900)
+        # fig.show()
 
     def validate_parse(self, rules_to_check):
         size = len(rules_to_check)
@@ -503,3 +598,5 @@ dt.build_tree()
 
 pred = dt.predict(want=True, worktime=10, criminal=False, member=9)
 print(f"Predicted: {pred}")
+
+dt.draw_graph_plotly()
