@@ -173,6 +173,7 @@ class DecisionTree:
 
         self.root = None
         self.nodes = None
+        self.nodes_set = None
 
     def add_rule(self, name, conditions=None, outcome=None, next_step=None):
         if outcome:
@@ -301,6 +302,7 @@ class DecisionTree:
         else:
             self.root = root
             self.nodes = nodes
+            self.nodes_set = set(nodes)
             print(f"Tree is valid, build complete")
 
     def predict(self, **kwargs):
@@ -462,14 +464,22 @@ class DecisionTree:
             return False, f"Some nodes was not visited {not_vis}", (None, None)
 
     def _get_network_nodes(self, pos, graph):
-        names = []
+        node_names = []
         node_x = []
         node_y = []
+        outcome_names = []
+        outcome_x = []
+        outcome_y = []
         for node in graph.nodes():
             x, y = pos[node]
-            names.append(str(node))
-            node_x.append(x)
-            node_y.append(y)
+            if node in self.nodes_set:
+                node_names.append(str(node))
+                node_x.append(x)
+                node_y.append(y)
+            else:
+                outcome_names.append(str(node))
+                outcome_x.append(x)
+                outcome_y.append(y)
 
         edge_x = []
         edge_y = []
@@ -494,9 +504,11 @@ class DecisionTree:
             edge_y.append(y1)
             edge_y.append(None)
 
-        return node_x, node_y, edge_x, edge_y, names, edge_center_x, edge_center_y
+        return node_x, node_y, node_names, \
+               edge_x, edge_y, edge_center_x, edge_center_y, \
+               outcome_x, outcome_y, outcome_names
 
-    def draw_graph_plotly(self):
+    def draw_graph_plotly(self, font_size=30):
         """
 
         Returns:
@@ -528,18 +540,19 @@ class DecisionTree:
 
         pos = graphviz_layout(G, prog='dot')
 
-        node_x, node_y, edge_x, edge_y, names, edge_center_x, edge_center_y = self._get_network_nodes(pos, G)
+        (node_x, node_y, node_names,
+         edge_x, edge_y, edge_center_x, edge_center_y,
+         outcome_x, outcome_y, outcome_names) = self._get_network_nodes(pos, G)
 
         node_trace = go.Scatter(
                 x=node_x, y=node_y,
                 mode='markers+text',
                 hoverinfo='text',
-                text=names,
+                text=node_names,
                 textposition="top center",
-                # textfont_size=20,
-                textfont={'size': 30},
+                textfont={'size': font_size, 'color': 'red', 'family': "arial"},
                 marker=dict(
-                        showscale=True,
+                        # showscale=True,
                         # colorscale options
                         # 'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
                         # 'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
@@ -548,13 +561,24 @@ class DecisionTree:
                         reversescale=True,
                         color=[],
                         size=10,
-                        colorbar=dict(
-                                thickness=15,
-                                title='Node Connections',
-                                xanchor='left',
-                                titleside='right'
-                        ),
-                        line_width=2))
+                        # colorbar=dict(
+                        #         thickness=15,
+                        #         title='Node Connections',
+                        #         xanchor='left',
+                        #         titleside='right'
+                        # ),
+                        line_width=2)
+        )
+
+        outcome_trace = go.Scatter(
+                x=outcome_x, y=outcome_y,
+                mode='markers+text',
+                hoverinfo='text',
+                text=outcome_names,
+                textposition="bottom center",
+                marker={"size": 20, "color": "#14F"},
+                textfont={'size': font_size, 'color': '#14F', 'family': "arial"}
+        )
 
         edge_trace = go.Scatter(
                 x=edge_x, y=edge_y,
@@ -562,7 +586,9 @@ class DecisionTree:
 
         cond_trace = go.Scatter(
                 x=edge_center_x, y=edge_center_y,
-                mode='text', text=conds, textfont_size=20, textposition='top center')
+                mode='text', text=conds,
+                textfont={'size': font_size, 'color': 'black', 'family': "arial"},
+                textposition='top center')
 
         layout = go.Layout(
                 showlegend=False,
@@ -576,7 +602,7 @@ class DecisionTree:
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
 
-        fig = go.Figure(data=[edge_trace, node_trace, cond_trace], layout=layout)
+        fig = go.Figure(data=[edge_trace, node_trace, cond_trace, outcome_trace], layout=layout)
         fig.write_image("tree.jpg", width=1600, height=900)
         # fig.show()
 
