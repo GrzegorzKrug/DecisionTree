@@ -1,6 +1,7 @@
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import networkx as nx
+from networkx.drawing.nx_agraph import graphviz_layout
 import numpy as np
 import warnings
 import re
@@ -306,9 +307,7 @@ class DecisionTree:
         # print(self.root)
         # print(self.nodes)
         next_name = self.root
-        print(f"Kwargs: {kwargs}")
         while next_name:
-            print()
             print(f"Checking: {next_name}")
             cur_name = next_name
             next_name = None
@@ -463,15 +462,20 @@ class DecisionTree:
             return False, f"Some nodes was not visited {not_vis}", (None, None)
 
     def _get_network_nodes(self, pos, graph):
+        names = []
         node_x = []
         node_y = []
         for node in graph.nodes():
             x, y = pos[node]
+            names.append(str(node))
             node_x.append(x)
             node_y.append(y)
 
         edge_x = []
         edge_y = []
+        edge_center_x = []
+        edge_center_y = []
+        offset = 7
 
         for p0, p1 in graph.edges():
             x0, y0 = pos[p0]
@@ -480,11 +484,17 @@ class DecisionTree:
             edge_x.append(x1)
             edge_x.append(None)
 
+            if x0 < x1:
+                edge_center_x.append(np.mean([x0, x1]) + offset)
+            else:
+                edge_center_x.append(np.mean([x0, x1]) - offset)
+            edge_center_y.append(np.mean([y0, y1]))
+
             edge_y.append(y0)
             edge_y.append(y1)
             edge_y.append(None)
 
-        return node_x, node_y, edge_x, edge_y
+        return node_x, node_y, edge_x, edge_y, names, edge_center_x, edge_center_y
 
     def draw_graph_plotly(self):
         """
@@ -492,34 +502,42 @@ class DecisionTree:
         Returns:
 
         """
-        G = nx.Graph()
+        G = nx.DiGraph()
         next_list = [self.root]
-        while next_list:
+        conds = []
+        while next_list and self.nodes:
             tmp_list = next_list
             next_list = []
             for cur_name in tmp_list:
-                that_node = self.nodes[cur_name]
-                for chc in that_node['childs']:
-                    G.add_node(chc)
-                    G.add_edge(cur_name, chc)
-                    next_list.append(chc)
+                that_node = self.tree[cur_name]
+                for rule in that_node:
+                    # print(f"adding rule")
+                    conds.append(rule.short_desc)
+                    if rule.outcome is not None:
+                        G.add_edge(cur_name, rule.outcome)
+                    else:
+                        G.add_edge(cur_name, rule.next_step)
+                        next_list.append(rule.next_step)
                 if cur_name in self.fail:
+                    conds.append('else')
                     if self.fail[cur_name]['outcome'] is not None:
-                        G.add_edge(cur_name, f"{cur_name}_else")
+                        G.add_edge(cur_name, self.fail[cur_name]['outcome'])
                     else:
                         G.add_edge(cur_name, self.fail[cur_name]['next'])
+                        next_list.append(self.fail[cur_name]['next'])
 
-        pos = nx.spring_layout(G)
+        pos = graphviz_layout(G, prog='dot')
 
-        # plt.figure()
-        # nx.draw(G)
-        # plt.show()
-        node_x, node_y, edge_x, edge_y = self._get_network_nodes(pos, G)
+        node_x, node_y, edge_x, edge_y, names, edge_center_x, edge_center_y = self._get_network_nodes(pos, G)
 
         node_trace = go.Scatter(
                 x=node_x, y=node_y,
-                mode='markers',
+                mode='markers+text',
                 hoverinfo='text',
+                text=names,
+                textposition="top center",
+                # textfont_size=20,
+                textfont={'size': 30},
                 marker=dict(
                         showscale=True,
                         # colorscale options
@@ -538,23 +556,27 @@ class DecisionTree:
                         ),
                         line_width=2))
 
-        edge_trace = go.Scatter(x=edge_x, y=edge_y)
+        edge_trace = go.Scatter(
+                x=edge_x, y=edge_y,
+                mode='lines')
+
+        cond_trace = go.Scatter(
+                x=edge_center_x, y=edge_center_y,
+                mode='text', text=conds, textfont_size=20, textposition='top center')
 
         layout = go.Layout(
-                title='<br>Network graph made with Python',
-                titlefont_size=16,
                 showlegend=False,
                 hovermode='closest',
                 margin=dict(b=20, l=5, r=5, t=40),
                 annotations=[dict(
-                        text="Python code: <a href='https://plotly.com/ipython-notebooks/network-graphs/'> https://plotly.com/ipython-notebooks/network-graphs/</a>",
+                        text="Decision Graph",
                         showarrow=False,
                         xref="paper", yref="paper",
                         x=0.005, y=-0.002)],
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
 
-        fig = go.Figure(data=[node_trace, edge_trace], layout=layout)
+        fig = go.Figure(data=[edge_trace, node_trace, cond_trace], layout=layout)
         fig.write_image("tree.jpg", width=1600, height=900)
         # fig.show()
 
@@ -579,20 +601,27 @@ class DecisionTree:
 
 dt = DecisionTree()
 
-dt.add_rule('want', "", next_step='worktime')
+dt.add_rule('want', next_step='worktime')
 dt.add_fail('want', outcome=0)
 
-dt.add_rule('worktime', "<1", outcome=5)
-dt.add_rule('worktime', ">=1<10", next_step='criminal')
-dt.add_rule('worktime', ">=10", next_step='member')
+dt.add_rule('worktime', "<2", outcome=2)
+dt.add_rule('worktime', "<3", outcome=3)
+dt.add_rule('worktime', "<5", outcome=5)
+dt.add_rule('worktime', ">=5", next_step='member')
+dt.add_fail('worktime', next_step='criminal')
 
-dt.add_rule('criminal', outcome=5)
-dt.add_fail('criminal', next_step='member')
+# dt.add_rule('worktime', "<1", outcome=5)
+# dt.add_rule('worktime', ">=1<10", next_step='criminal')
+# dt.add_rule('worktime', ">=10", next_step='member')
 
-dt.add_rule('member', '<5', outcome=5)
-dt.add_rule('member', '==8', outcome=15)
-dt.add_rule('member', '>=5', outcome=35)
-dt.add_fail('member', outcome=15)
+dt.add_rule('criminal', outcome=1)
+dt.add_fail('criminal', outcome=5)
+
+dt.add_rule('member', '<5', outcome=15)
+# dt.add_rule('member', '==8', outcome=15)
+# dt.add_rule('member', '>=5', outcome=35)
+# # dt.add_rule('member', '>=5', next_step='criminal')
+dt.add_fail('member', outcome=12)
 
 dt.build_tree()
 
