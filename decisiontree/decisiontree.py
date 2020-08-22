@@ -480,7 +480,13 @@ class DecisionTree:
                 node_x.append(x)
                 node_y.append(y)
             else:
-                outcome_names.append(str(node))
+                # node = str(node)
+                # if node.endswith("_else"):
+                #     node = node[:-5]
+                #     outcome_names.append(self.fail[node]['outcome'])
+                # else:
+                name, val = node.split(';')
+                outcome_names.append(str(val))
                 outcome_x.append(x)
                 outcome_y.append(y)
 
@@ -528,14 +534,15 @@ class DecisionTree:
                     # print(f"adding rule")
                     conds.append(rule.short_desc)
                     if rule.outcome is not None:
-                        G.add_edge(cur_name, rule.outcome)
+                        G.add_edge(cur_name, f"{cur_name};{rule.outcome}")
                     else:
                         G.add_edge(cur_name, rule.next_step)
                         next_list.append(rule.next_step)
                 if cur_name in self.fail:
                     conds.append('else')
                     if self.fail[cur_name]['outcome'] is not None:
-                        G.add_edge(cur_name, self.fail[cur_name]['outcome'])
+                        outcome = self.fail[cur_name]['outcome']
+                        G.add_edge(cur_name, f"{cur_name};{outcome}")
                     else:
                         G.add_edge(cur_name, self.fail[cur_name]['next'])
                         next_list.append(self.fail[cur_name]['next'])
@@ -554,21 +561,10 @@ class DecisionTree:
                 textposition="top center",
                 textfont={'size': font_size, 'color': 'red', 'family': "arial"},
                 marker=dict(
-                        # showscale=True,
-                        # colorscale options
-                        # 'Greys' | 'YlGnBu' | 'Greens' | 'YlOrRd' | 'Bluered' | 'RdBu' |
-                        # 'Reds' | 'Blues' | 'Picnic' | 'Rainbow' | 'Portland' | 'Jet' |
-                        # 'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
                         colorscale='YlGnBu',
                         reversescale=True,
                         color="#F32",
                         size=10,
-                        # colorbar=dict(
-                        #         thickness=15,
-                        #         title='Node Connections',
-                        #         xanchor='left',
-                        #         titleside='right'
-                        # ),
                         line_width=1)
         )
 
@@ -578,7 +574,7 @@ class DecisionTree:
                 hoverinfo='text',
                 text=outcome_names,
                 textposition="middle center",
-                marker={"size": 45, "color": "#124", "symbol": "square", "line_width": 4},
+                marker={"size": 45, "color": "#124", "symbol": "square", "line_width": 4, "line_color": "#590"},
                 textfont={'size': 20, 'color': '#FFF', 'family': "arial"}
         )
 
@@ -590,7 +586,8 @@ class DecisionTree:
         cond_trace = go.Scatter(
                 x=edge_center_x, y=edge_center_y,
                 mode='text', text=conds,
-                textfont={'size': font_size, 'color': 'black', 'family': "arial"},
+                hoverinfo='none',
+                textfont={'size': 25, 'color': 'black', 'family': "arial"},
                 textposition='top center')
 
         layout = go.Layout(
@@ -612,7 +609,7 @@ class DecisionTree:
         if write_file:
             write_file = os.path.abspath(write_file)
             fig.write_image(write_file, width=1600, height=900)
-        # fig.show()
+        fig.show()
 
     def validate_parse(self, rules_to_check):
         size = len(rules_to_check)
@@ -640,22 +637,16 @@ dt.add_fail('want', outcome=0)
 
 dt.add_rule('worktime', "<2>1", outcome=2)
 dt.add_rule('worktime', "<3", outcome=3)
-dt.add_rule('worktime', "<5", outcome=555)
+dt.add_rule('worktime', "<5", outcome=5)
 dt.add_rule('worktime', ">=5", next_step='member')
 dt.add_fail('worktime', next_step='criminal')
-
-# dt.add_rule('worktime', "<1", outcome=5)
-# dt.add_rule('worktime', ">=1<10", next_step='criminal')
-# dt.add_rule('worktime', ">=10", next_step='member')
 
 dt.add_rule('criminal', outcome=1)
 dt.add_fail('criminal', outcome=5)
 
-dt.add_rule('member', '<5', outcome=15)
-# dt.add_rule('member', '==8', outcome=15)
-# dt.add_rule('member', '>=5', outcome=35)
-# # dt.add_rule('member', '>=5', next_step='criminal')
-dt.add_fail('member', outcome=12)
+dt.add_rule('member', '<5', outcome=5)
+dt.add_rule('member', '>=10', outcome=25)
+dt.add_fail('member', outcome=10)
 
 dt.build_tree()
 
