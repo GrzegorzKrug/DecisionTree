@@ -464,12 +464,15 @@ class DecisionTree:
             return False, f"Some nodes was not visited {not_vis}", (None, None)
 
     def _get_network_nodes(self, pos, graph):
+        offset = 10
+
         node_names = []
         node_x = []
         node_y = []
         outcome_names = []
         outcome_x = []
         outcome_y = []
+
         for node in graph.nodes():
             x, y = pos[node]
             if node in self.nodes_set:
@@ -485,7 +488,6 @@ class DecisionTree:
         edge_y = []
         edge_center_x = []
         edge_center_y = []
-        offset = 7
 
         for p0, p1 in graph.edges():
             x0, y0 = pos[p0]
@@ -546,7 +548,7 @@ class DecisionTree:
 
         node_trace = go.Scatter(
                 x=node_x, y=node_y,
-                mode='markers+text',
+                mode='markers',
                 hoverinfo='text',
                 text=node_names,
                 textposition="top center",
@@ -559,7 +561,7 @@ class DecisionTree:
                         # 'Hot' | 'Blackbody' | 'Earth' | 'Electric' | 'Viridis' |
                         colorscale='YlGnBu',
                         reversescale=True,
-                        color=[],
+                        color="#F32",
                         size=10,
                         # colorbar=dict(
                         #         thickness=15,
@@ -567,21 +569,22 @@ class DecisionTree:
                         #         xanchor='left',
                         #         titleside='right'
                         # ),
-                        line_width=2)
+                        line_width=1)
         )
 
         outcome_trace = go.Scatter(
                 x=outcome_x, y=outcome_y,
-                mode='markers+text',
+                mode='text+markers',
                 hoverinfo='text',
                 text=outcome_names,
-                textposition="bottom center",
-                marker={"size": 20, "color": "#14F"},
-                textfont={'size': font_size, 'color': '#14F', 'family': "arial"}
+                textposition="middle center",
+                marker={"size": 45, "color": "#124", "symbol": "square", "line_width": 4},
+                textfont={'size': 20, 'color': '#FFF', 'family': "arial"}
         )
 
         edge_trace = go.Scatter(
                 x=edge_x, y=edge_y,
+                marker=dict(color="#037"),
                 mode='lines')
 
         cond_trace = go.Scatter(
@@ -599,6 +602,13 @@ class DecisionTree:
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
 
         fig = go.Figure(data=[edge_trace, node_trace, cond_trace, outcome_trace], layout=layout)
+
+        for node in self.nodes:
+            p1 = pos[node]
+            fig.add_annotation(x=p1[0], y=p1[1], ax=0,
+                               text=str(node), font=dict(size=20, family="Arial"), bgcolor="#CCF"
+                               )
+
         if write_file:
             write_file = os.path.abspath(write_file)
             fig.write_image(write_file, width=1600, height=900)
@@ -630,7 +640,7 @@ dt.add_fail('want', outcome=0)
 
 dt.add_rule('worktime', "<2>1", outcome=2)
 dt.add_rule('worktime', "<3", outcome=3)
-dt.add_rule('worktime', "<5", outcome=5)
+dt.add_rule('worktime', "<5", outcome=555)
 dt.add_rule('worktime', ">=5", next_step='member')
 dt.add_fail('worktime', next_step='criminal')
 
