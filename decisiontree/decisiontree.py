@@ -4,6 +4,7 @@ import networkx as nx
 from networkx.drawing.nx_agraph import graphviz_layout
 import numpy as np
 import warnings
+import os
 import re
 
 
@@ -294,7 +295,6 @@ class DecisionTree:
 
     def build_tree(self):
         self.check_tree_keys()
-        # self.check_condition_conflicts()
         valid, cmt, (root, nodes) = self.check_graph_sequence()
 
         if not valid:
@@ -335,14 +335,14 @@ class DecisionTree:
                     break
 
             if valid:
-                print(f"Valid, out:{outcome}, next:{next_name}")
+                # print(f"Valid, out:{outcome}, next:{next_name}")
                 if outcome:
                     return outcome
                 elif next_name:
                     pass
             else:
                 fail_cond = self.fail.get(cur_name)
-                print(f"Not apply, {fail_cond}")
+                # print(f"Not apply, {fail_cond}")
                 try:
                     outcome, next_name = fail_cond['outcome'], fail_cond['next']
                 except TypeError:
@@ -508,7 +508,7 @@ class DecisionTree:
                edge_x, edge_y, edge_center_x, edge_center_y, \
                outcome_x, outcome_y, outcome_names
 
-    def draw_graph_plotly(self, font_size=30):
+    def draw_graph_plotly(self, write_file=None, font_size=30):
         """
 
         Returns:
@@ -593,17 +593,15 @@ class DecisionTree:
         layout = go.Layout(
                 showlegend=False,
                 hovermode='closest',
+                title="Decision Graph",
                 margin=dict(b=20, l=5, r=5, t=40),
-                annotations=[dict(
-                        text="Decision Graph",
-                        showarrow=False,
-                        xref="paper", yref="paper",
-                        x=0.005, y=-0.002)],
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
 
         fig = go.Figure(data=[edge_trace, node_trace, cond_trace, outcome_trace], layout=layout)
-        fig.write_image("tree.jpg", width=1600, height=900)
+        if write_file:
+            write_file = os.path.abspath(write_file)
+            fig.write_image(write_file, width=1600, height=900)
         # fig.show()
 
     def validate_parse(self, rules_to_check):
@@ -630,7 +628,7 @@ dt = DecisionTree()
 dt.add_rule('want', next_step='worktime')
 dt.add_fail('want', outcome=0)
 
-dt.add_rule('worktime', "<2", outcome=2)
+dt.add_rule('worktime', "<2>1", outcome=2)
 dt.add_rule('worktime', "<3", outcome=3)
 dt.add_rule('worktime', "<5", outcome=5)
 dt.add_rule('worktime', ">=5", next_step='member')
@@ -651,7 +649,7 @@ dt.add_fail('member', outcome=12)
 
 dt.build_tree()
 
-pred = dt.predict(want=True, worktime=10, criminal=False, member=9)
+pred = dt.predict(want=True, worktime=2, criminal=False, member=9)
 print(f"Predicted: {pred}")
 
-dt.draw_graph_plotly()
+dt.draw_graph_plotly('tree.jpg')
