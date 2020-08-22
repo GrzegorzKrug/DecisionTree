@@ -166,7 +166,7 @@ class RuleClass(RuleBase):
 
 
 class DecisionTree:
-    def __init__(self):
+    def __init__(self, title=None):
         self.tree = {}
         self.fail = {}
         self.ord_symbols = [r"<=", r">=", r"<", r">", "==", "!="]
@@ -175,6 +175,8 @@ class DecisionTree:
         self.root = None
         self.nodes = None
         self.nodes_set = None
+
+        self.title = title
 
     def add_rule(self, name, conditions=None, outcome=None, next_step=None):
         if outcome:
@@ -426,12 +428,12 @@ class DecisionTree:
 
         root = list(roots)[0]
         visited = {root}
-        goto_nodes = nodes.get(root).get('childs')
+        goto_nodes = list(nodes.get(root).get('childs'))
 
         n = 0
-        while goto_nodes and n < 10:
+        while goto_nodes and n < 1000:
             n += 1
-            next_nodes = set()
+            next_nodes = []
             for cur_name in goto_nodes:
                 if cur_name in visited:
                     err = f"This node was visited before: {cur_name}"
@@ -441,17 +443,16 @@ class DecisionTree:
                 checking_node = nodes[cur_name]
                 vis_num = checking_node.get('visited', 0) + 1
                 checking_node.update({'visited': vis_num})
-
                 if 1 >= len(checking_node.get('parents')):
                     "Adding parents, its only 1, no conflicts"
                     visited.add(cur_name)
                     for ch in checking_node.get('childs'):
-                        next_nodes.add(ch)
+                        next_nodes.append(ch)
                 elif vis_num >= len(checking_node.get('parents')):
                     "Joining paths"
                     visited.add(cur_name)
                     for ch in checking_node.get('childs'):
-                        next_nodes.add(ch)
+                        next_nodes.append(ch)
                 else:
                     "Ignore / wait to join"
 
@@ -593,7 +594,7 @@ class DecisionTree:
         layout = go.Layout(
                 showlegend=False,
                 hovermode='closest',
-                title="Decision Graph",
+                title=self.title,
                 margin=dict(b=20, l=5, r=5, t=40),
                 xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
                 yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
@@ -630,10 +631,13 @@ class DecisionTree:
             print("Rules are not even, len:", size, rules_to_check)
 
 
-dt = DecisionTree()
+dt = DecisionTree(title="Credit decision tree")
 
 dt.add_rule('want', next_step='worktime')
-dt.add_fail('want', outcome=0)
+dt.add_fail('want', next_step='need')
+
+dt.add_rule('need', next_step='criminal')
+dt.add_fail('need', outcome=0)
 
 dt.add_rule('worktime', "<2>1", outcome=2)
 dt.add_rule('worktime', "<3", outcome=3)
